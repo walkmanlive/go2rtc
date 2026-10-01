@@ -1,13 +1,17 @@
 name: Build ARMv7 softfloat
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:          # 手动触发
   push:
-    branches: [master]
+    tags:
+      - 'v*'                  # 推送 v1.0.0 这种 tag 时自动发布
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write         # 允许创建 Release
+
     steps:
       - uses: actions/checkout@v4
 
@@ -29,8 +33,22 @@ jobs:
           upx --best --lzma go2rtc_linux_armv7eabi
           ls -lh go2rtc_linux_armv7eabi
 
-      - name: Upload
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: go2rtc-armv7eabi-softfloat
           path: go2rtc_linux_armv7eabi
+
+      # 只有手动触发 或 打了 tag 时才创建 Release
+      - name: Create Release
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('armv7eabi-{0}', github.run_number) }}
+          name: go2rtc ARMv7 softfloat ${{ github.ref_type == 'tag' && github.ref_name || format('#{0}', github.run_number) }}
+          files: go2rtc_linux_armv7eabi
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
